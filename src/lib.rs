@@ -1,3 +1,20 @@
+#![deny(missing_docs)]
+// Documentation
+//! This is a simple domain matching algorithm to match domains against a set of user-defined domain rules.
+//!
+//! Features:
+//!
+//! -  Super fast (200 ns per match for a 73300+ domain rule set)
+//! -  No dependencies
+//!
+//! # Getting Started
+//!
+//! ```
+//! let mut matcher = Dmatcher::new();
+//! matcher.insert("apple.com");
+//! assert_eq!(matcher.contains("store.apple.com"), true);
+//! ```
+
 use std::collections::HashMap;
 
 #[derive(Debug, PartialEq, Clone)]
@@ -7,7 +24,7 @@ struct LevelNode<'a> {
 }
 
 impl<'a> LevelNode<'a> {
-    pub fn new(name: &'a str) -> Self {
+    fn new(name: &'a str) -> Self {
         Self {
             name: Some(name),
             next_lvs: HashMap::new(),
@@ -16,11 +33,19 @@ impl<'a> LevelNode<'a> {
 }
 
 #[derive(Debug)]
+/// Dmatcher matcher algorithm
 pub struct Dmatcher<'a> {
     root: LevelNode<'a>,
 }
 
+impl<'a> Default for Dmatcher<'a> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<'a> Dmatcher<'a> {
+    /// Create a matcher.
     pub fn new() -> Self {
         Self {
             root: LevelNode {
@@ -35,6 +60,7 @@ impl<'a> Dmatcher<'a> {
         &self.root
     }
 
+    /// Pass in a string containing `\n` and get all domains inserted.
     pub fn insert_lines(&mut self, domain: &'a str) {
         let lvs: Vec<&str> = domain.split('\n').collect();
         for lv in lvs {
@@ -42,6 +68,7 @@ impl<'a> Dmatcher<'a> {
         }
     }
 
+    /// Pass in a domain and insert it in the matcher.
     pub fn insert(&mut self, domain: &'a str) {
         let mut lvs: Vec<&str> = domain.split('.').collect();
         lvs.reverse();
@@ -51,16 +78,17 @@ impl<'a> Dmatcher<'a> {
                 // We should not include sub-levels like ""
                 continue;
             }
-            ptr = ptr.next_lvs.entry(lv).or_insert(LevelNode::new(lv));
+            ptr = ptr.next_lvs.entry(lv).or_insert_with(|| LevelNode::new(lv));
         }
     }
 
+    /// Match the domain against inserted domain rules. If `apple.com` is inserted, then `www.apple.com` and `stores.www.apple.com` is considered as matched while `apple.cn` is not.
     pub fn contains(&self, domain: &str) -> bool {
         let mut lvs: Vec<&str> = domain.split('.').collect();
         lvs.reverse();
         let mut ptr = &self.root;
         for lv in lvs {
-            if ptr.next_lvs.len() == 0 {
+            if ptr.next_lvs.is_empty() {
                 break;
             }
             ptr = match ptr.next_lvs.get(lv) {
