@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 
+cargo build
+cargo test
+cargo clippy
+
 echo -n "Adding to git..."
 git add --all
 echo "Done."

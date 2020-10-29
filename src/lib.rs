@@ -10,6 +10,7 @@
 //! # Getting Started
 //!
 //! ```
+//! use dmatcher::Dmatcher;
 //! let mut matcher = Dmatcher::new();
 //! matcher.insert("apple.com");
 //! assert_eq!(matcher.contains("store.apple.com"), true);
