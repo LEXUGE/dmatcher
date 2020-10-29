@@ -4,7 +4,7 @@
 //!
 //! Features:
 //!
-//! -  Super fast (200 ns per match for a 73300+ domain rule set)
+//! -  Super fast (150 ns per match for a 73300+ domain rule set)
 //! -  No dependencies
 //!
 //! # Getting Started
