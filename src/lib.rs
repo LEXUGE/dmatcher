@@ -16,7 +16,7 @@
 //! assert_eq!(matcher.contains("store.apple.com"), true);
 //! ```
 
-use std::collections::HashMap;
+use hashbrown::HashMap;
 
 #[derive(Debug, PartialEq, Clone)]
 struct LevelNode<'a> {
@@ -104,7 +104,7 @@ impl<'a> Dmatcher<'a> {
 #[cfg(test)]
 mod tests {
     use super::{Dmatcher, LevelNode};
-    use std::collections::HashMap;
+    use hashbrown::HashMap;
 
     #[test]
     fn contains() {
