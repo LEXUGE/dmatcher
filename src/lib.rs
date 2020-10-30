@@ -13,7 +13,7 @@
 //! use dmatcher::Dmatcher;
 //! let mut matcher = Dmatcher::new();
 //! matcher.insert("apple.com");
-//! assert_eq!(matcher.contains("store.apple.com"), true);
+//! assert_eq!(matcher.matches("store.apple.com"), true);
 //! ```
 
 use hashbrown::HashMap;
@@ -84,11 +84,15 @@ impl<'a> Dmatcher<'a> {
     }
 
     /// Match the domain against inserted domain rules. If `apple.com` is inserted, then `www.apple.com` and `stores.www.apple.com` is considered as matched while `apple.cn` is not.
-    pub fn contains(&self, domain: &str) -> bool {
+    pub fn matches(&self, domain: &str) -> bool {
         let mut lvs: Vec<&str> = domain.split('.').collect();
         lvs.reverse();
         let mut ptr = &self.root;
         for lv in lvs {
+            if lv == "" {
+                // We should not include sub-levels like ""
+                continue;
+            }
             if ptr.next_lvs.is_empty() {
                 break;
             }
@@ -107,13 +111,13 @@ mod tests {
     use hashbrown::HashMap;
 
     #[test]
-    fn contains() {
+    fn matches() {
         let mut matcher = Dmatcher::new();
         matcher.insert("apple.com");
         matcher.insert("apple.cn");
-        assert_eq!(matcher.contains("store.apple.com"), true);
-        assert_eq!(matcher.contains("baidu"), false);
-        assert_eq!(matcher.contains("你好.store.www.apple.com"), true);
+        assert_eq!(matcher.matches("store.apple.com"), true);
+        assert_eq!(matcher.matches("baidu"), false);
+        assert_eq!(matcher.matches("你好.store.www.apple.com"), true);
     }
 
     #[test]

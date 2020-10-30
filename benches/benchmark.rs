@@ -10,7 +10,7 @@ fn bench_match(c: &mut Criterion) {
     file.read_to_string(&mut contents).unwrap();
     matcher.insert_lines(&contents);
     c.bench_function("match", |b| {
-        b.iter(|| matcher.contains("你好.store.www.baidu.com"))
+        b.iter(|| matcher.matches("你好.store.www.baidu.com"))
     });
 }
 
