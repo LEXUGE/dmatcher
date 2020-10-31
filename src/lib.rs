@@ -33,7 +33,7 @@ impl<'a> LevelNode<'a> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 /// Dmatcher matcher algorithm
 pub struct Dmatcher<'a> {
     root: LevelNode<'a>,
