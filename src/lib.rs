@@ -13,21 +13,22 @@
 //! use dmatcher::Dmatcher;
 //! let mut matcher = Dmatcher::new();
 //! matcher.insert("apple.com");
-//! assert_eq!(matcher.matches("store.apple.com"), true);
+//! assert_eq!(matcher.matches("store.apple.com").unwrap(), true);
 //! ```
 
 use hashbrown::HashMap;
+use trust_dns_proto::error::ProtoResult;
+use trust_dns_proto::rr::domain::IntoName;
+use trust_dns_proto::rr::domain::Label;
 
 #[derive(Debug, PartialEq, Clone)]
-struct LevelNode<'a> {
-    name: Option<&'a str>,
-    next_lvs: HashMap<&'a str, LevelNode<'a>>,
+struct LevelNode {
+    next_lvs: HashMap<Label, LevelNode>,
 }
 
-impl<'a> LevelNode<'a> {
-    fn new(name: &'a str) -> Self {
+impl LevelNode {
+    fn new() -> Self {
         Self {
-            name: Some(name),
             next_lvs: HashMap::new(),
         }
     }
@@ -35,22 +36,21 @@ impl<'a> LevelNode<'a> {
 
 #[derive(Debug, Clone)]
 /// Dmatcher matcher algorithm
-pub struct Dmatcher<'a> {
-    root: LevelNode<'a>,
+pub struct Dmatcher {
+    root: LevelNode,
 }
 
-impl<'a> Default for Dmatcher<'a> {
+impl Default for Dmatcher {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<'a> Dmatcher<'a> {
+impl Dmatcher {
     /// Create a matcher.
     pub fn new() -> Self {
         Self {
             root: LevelNode {
-                name: None,
                 next_lvs: HashMap::new(),
             },
         }
@@ -62,46 +62,43 @@ impl<'a> Dmatcher<'a> {
     }
 
     /// Pass in a string containing `\n` and get all domains inserted.
-    pub fn insert_lines(&mut self, domain: &'a str) {
+    pub fn insert_lines(&mut self, domain: String) -> ProtoResult<()> {
         let lvs: Vec<&str> = domain.split('\n').collect();
         for lv in lvs {
-            self.insert(lv);
+            self.insert(lv)?;
         }
+        Ok(())
     }
 
-    /// Pass in a domain and insert it in the matcher.
-    pub fn insert(&mut self, domain: &'a str) {
-        let mut lvs: Vec<&str> = domain.split('.').collect();
-        lvs.reverse();
+    /// Pass in a domain and insert it into the matcher.
+    pub fn insert<T: IntoName>(&mut self, domain: T) -> ProtoResult<()> {
+        let lvs = T::into_name(domain)?;
+        let lvs = lvs.iter().rev();
         let mut ptr = &mut self.root;
         for lv in lvs {
-            if lv == "" {
-                // We should not include sub-levels like ""
-                continue;
-            }
-            ptr = ptr.next_lvs.entry(lv).or_insert_with(|| LevelNode::new(lv));
+            ptr = ptr
+                .next_lvs
+                .entry(Label::from_raw_bytes(lv)?)
+                .or_insert_with(LevelNode::new);
         }
+        Ok(())
     }
 
     /// Match the domain against inserted domain rules. If `apple.com` is inserted, then `www.apple.com` and `stores.www.apple.com` is considered as matched while `apple.cn` is not.
-    pub fn matches(&self, domain: &str) -> bool {
-        let mut lvs: Vec<&str> = domain.split('.').collect();
-        lvs.reverse();
+    pub fn matches<T: IntoName>(&mut self, domain: T) -> ProtoResult<bool> {
+        let lvs = T::into_name(domain)?;
+        let lvs = lvs.iter().rev();
         let mut ptr = &self.root;
         for lv in lvs {
-            if lv == "" {
-                // We should not include sub-levels like ""
-                continue;
-            }
             if ptr.next_lvs.is_empty() {
                 break;
             }
-            ptr = match ptr.next_lvs.get(lv) {
+            ptr = match ptr.next_lvs.get(&Label::from_raw_bytes(lv)?) {
                 Some(v) => v,
-                None => return false,
+                None => return Ok(false),
             };
         }
-        true
+        Ok(true)
     }
 }
 
@@ -109,71 +106,70 @@ impl<'a> Dmatcher<'a> {
 mod tests {
     use super::{Dmatcher, LevelNode};
     use hashbrown::HashMap;
+    use trust_dns_proto::error::ProtoResult;
+    use trust_dns_proto::rr::domain::Label;
 
     #[test]
-    fn matches() {
+    fn matches() -> ProtoResult<()> {
         let mut matcher = Dmatcher::new();
-        matcher.insert("apple.com");
-        matcher.insert("apple.cn");
-        assert_eq!(matcher.matches("store.apple.com"), true);
-        assert_eq!(matcher.matches("baidu"), false);
-        assert_eq!(matcher.matches("你好.store.www.apple.com"), true);
+        matcher.insert("apple.com")?;
+        matcher.insert("apple.cn")?;
+        assert_eq!(matcher.matches("store.apple.com")?, true);
+        assert_eq!(matcher.matches("baidu")?, false);
+        assert_eq!(matcher.matches("你好.store.www.apple.com")?, true);
+        Ok(())
     }
 
     #[test]
-    fn insertion() {
+    fn insertion() -> ProtoResult<()> {
         let mut matcher = Dmatcher::new();
-        matcher.insert("apple.com");
-        matcher.insert("apple.cn");
+        matcher.insert("apple.com")?;
+        matcher.insert("apple.cn")?;
         println!("{:?}", matcher.get_root());
         assert_eq!(
             matcher.get_root(),
             &LevelNode {
-                name: None,
                 next_lvs: [
                     (
-                        "cn",
+                        Label::from_utf8("cn")?,
                         LevelNode {
-                            name: Some("cn"),
                             next_lvs: [(
-                                "apple",
+                                Label::from_utf8("apple")?,
                                 LevelNode {
-                                    name: Some("apple"),
                                     next_lvs: []
                                         .iter()
                                         .cloned()
-                                        .collect::<HashMap<&str, LevelNode>>()
+                                        .collect::<HashMap<Label, LevelNode>>()
                                 }
                             )]
                             .iter()
                             .cloned()
-                            .collect::<HashMap<&str, LevelNode>>()
+                            .collect::<HashMap<Label, LevelNode>>()
                         }
                     ),
                     (
-                        "com",
+                        Label::from_utf8("com")?,
                         LevelNode {
-                            name: Some("com"),
                             next_lvs: [(
-                                "apple",
+                                Label::from_utf8("apple")?,
                                 LevelNode {
-                                    name: Some("apple"),
                                     next_lvs: []
                                         .iter()
                                         .cloned()
-                                        .collect::<HashMap<&str, LevelNode>>()
+                                        .collect::<HashMap<Label, LevelNode>>()
                                 }
                             )]
                             .iter()
                             .cloned()
-                            .collect::<HashMap<&str, LevelNode>>()
+                            .collect::<HashMap<Label, LevelNode>>()
                         }
                     )
                 ]
                 .iter()
                 .cloned()
-                .collect::<HashMap<&str, LevelNode>>()
+                .collect::<HashMap<Label, LevelNode>>()
             }
         );
+        Ok(())
     }
 }

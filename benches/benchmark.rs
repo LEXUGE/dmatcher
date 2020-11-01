@@ -4,13 +4,13 @@ use std::fs::File;
 use std::io::Read;
 
 fn bench_match(c: &mut Criterion) {
-    let mut file = File::open("./benches/accelerated-domains.china.raw.txt").unwrap();
+    let mut file = File::open("./benches/sample.txt").unwrap();
     let mut contents = String::new();
     let mut matcher = Dmatcher::new();
     file.read_to_string(&mut contents).unwrap();
-    matcher.insert_lines(&contents);
+    matcher.insert_lines(contents).unwrap();
     c.bench_function("match", |b| {
-        b.iter(|| matcher.matches("你好.store.www.baidu.com"))
+        b.iter(|| assert_eq!(matcher.matches("你好.store.www.baidu.com").unwrap(), true))
     });
 }
 

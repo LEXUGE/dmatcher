@@ -1,6 +1,6 @@
 [package]
 name = "dmatcher"
-version = "0.1.5"
+version = "0.1.6"
 authors = ["Harry Ying <lexugeyky@outlook.com>"]
 edition = "2018"
 description = "A simple domain matching algorithm, intended to be fast."
@@ -11,6 +11,7 @@ license = "GPL-3.0"
 
 [dependencies]
 hashbrown = "^0.9"
+trust-dns-proto = { version = "^0.19", default-features = false }
 
 [dev-dependencies]
 criterion = "^0.3"
