@@ -85,7 +85,7 @@ impl Dmatcher {
     }
 
     /// Match the domain against inserted domain rules. If `apple.com` is inserted, then `www.apple.com` and `stores.www.apple.com` is considered as matched while `apple.cn` is not.
-    pub fn matches<T: IntoName>(&mut self, domain: T) -> ProtoResult<bool> {
+    pub fn matches<T: IntoName>(&self, domain: T) -> ProtoResult<bool> {
         let lvs = T::into_name(domain)?;
         let lvs = lvs.iter().rev();
         let mut ptr = &self.root;
