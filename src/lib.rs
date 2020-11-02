@@ -127,7 +127,8 @@ mod tests {
         matcher.insert("apple.com", 1)?;
         matcher.insert("apple.cn", 2)?;
         assert_eq!(matcher.matches("store.apple.com")?, Some(1));
-        assert_eq!(matcher.matches("baidu")?, None);
+        assert_eq!(matcher.matches("store.apple.com.")?, Some(1));
+        assert_eq!(matcher.matches("baidu.com")?, None);
         assert_eq!(matcher.matches("你好.store.www.apple.cn")?, Some(2));
         Ok(())
     }
