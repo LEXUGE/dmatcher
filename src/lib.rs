@@ -4,7 +4,7 @@
 //!
 //! Features:
 //!
-//! -  Super fast (3 us per match for a 73300+ domain rule set)
+//! -  Super fast (197 ns per match for a 73300+ domain rule set)
 //! -  No dependencies
 //!
 //! # Getting Started
@@ -17,9 +17,11 @@
 //! ```
 
 use hashbrown::HashMap;
+use std::sync::Arc;
 use trust_dns_proto::error::ProtoResult;
-use trust_dns_proto::rr::domain::IntoName;
-use trust_dns_proto::rr::domain::Label;
+
+/// Type alias for Dmatcher internal usages. Exposed in case that you need it.
+pub type Label = Arc<str>;
 
 #[derive(Debug, PartialEq, Clone)]
 struct LevelNode<T: Copy> {
@@ -71,14 +73,18 @@ impl<T: Copy> Dmatcher<T> {
     }
 
     /// Pass in a domain and insert it into the matcher.
-    pub fn insert<U: IntoName>(&mut self, domain: U, dst: T) -> ProtoResult<()> {
-        let lvs = U::into_name(domain)?;
-        let lvs = lvs.iter().rev();
+    pub fn insert(&mut self, domain: &str, dst: T) -> ProtoResult<()> {
+        let mut lvs: Vec<&str> = domain.split('.').collect();
+        lvs.reverse();
         let mut ptr = &mut self.root;
         for lv in lvs {
+            if lv == "" {
+                // We should not include sub-levels like ""
+                continue;
+            }
             ptr = ptr
                 .next_lvs
-                .entry(Label::from_raw_bytes(lv)?)
+                .entry(Arc::from(lv))
                 .or_insert_with(LevelNode::new);
         }
         ptr.dst = Some(dst);
@@ -86,16 +92,16 @@ impl<T: Copy> Dmatcher<T> {
     }
 
     /// Match the domain against inserted domain rules. If `apple.com` is inserted, then `www.apple.com` and `stores.www.apple.com` is considered as matched while `apple.cn` is not.
-    pub fn matches<U: IntoName>(&self, domain: U) -> ProtoResult<Option<T>> {
-        let lvs = U::into_name(domain)?;
-        let lvs = lvs.iter().rev();
+    pub fn matches(&self, domain: &str) -> ProtoResult<Option<T>> {
+        let mut lvs: Vec<&str> = domain.split('.').collect();
+        lvs.reverse();
         let mut ptr = &self.root;
         for lv in lvs {
             if ptr.next_lvs.is_empty() {
                 break;
             }
             // If not empty...
-            ptr = match ptr.next_lvs.get(&Label::from_raw_bytes(lv)?) {
+            ptr = match ptr.next_lvs.get(lv) {
                 Some(v) => v,
                 None => return Ok(None),
             };
@@ -106,10 +112,10 @@ impl<T: Copy> Dmatcher<T> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Dmatcher, LevelNode};
+    use super::{Dmatcher, Label, LevelNode};
     use hashbrown::HashMap;
+    use std::sync::Arc;
     use trust_dns_proto::error::ProtoResult;
-    use trust_dns_proto::rr::domain::Label;
 
     #[test]
     fn matches() -> ProtoResult<()> {
@@ -134,11 +140,11 @@ mod tests {
                 dst: None,
                 next_lvs: [
                     (
-                        Label::from_utf8("cn")?,
+                        Arc::from("cn"),
                         LevelNode {
                             dst: None,
                             next_lvs: [(
-                                Label::from_utf8("apple")?,
+                                Arc::from("apple"),
                                 LevelNode {
                                     dst: Some(2),
                                     next_lvs: []
@@ -153,11 +159,11 @@ mod tests {
                         }
                     ),
                     (
-                        Label::from_utf8("com")?,
+                        Arc::from("com"),
                         LevelNode {
                             dst: None,
                             next_lvs: [(
-                                Label::from_utf8("apple")?,
+                                Arc::from("apple"),
                                 LevelNode {
                                     dst: Some(1),
                                     next_lvs: []
