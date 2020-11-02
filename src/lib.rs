@@ -97,6 +97,10 @@ impl<T: Copy> Dmatcher<T> {
         lvs.reverse();
         let mut ptr = &self.root;
         for lv in lvs {
+            if lv == "" {
+                // We should not include sub-levels like ""
+                continue;
+            }
             if ptr.next_lvs.is_empty() {
                 break;
             }
